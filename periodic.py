@@ -42,8 +42,7 @@ def insert_to_db():
     cursor.execute("DELETE FROM group_vk")
     cursor.executemany("INSERT INTO group_vk VALUES (?, ?)", list_group)
 
-    update_date = str(datetime.now())
-    history_record = [(update_date, total_count)]
+    history_record = [(str(datetime.now()), total_count)]
     cursor.executemany("INSERT INTO history_record VALUES (?, ?)", history_record)
 
     conn.commit()
@@ -54,7 +53,7 @@ app.conf.beat_schedule = {
         "task": "periodic.insert_to_db",
         "schedule": crontab(hour=8, minute="32")
     },
-    "total_count-in-ten-seconds-task": {
+    "total_count-in-onetime-everyday-task": {
         "task": "periodic.take_group_count",
         "schedule": crontab(hour=8, minute="31")
     }

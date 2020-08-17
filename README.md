@@ -12,10 +12,18 @@
 Запустите тест
 
 ## Runnig
-1. В файле `periodic.py` задайте необходимое вам расписание запуска модуля `vk_parser`.
+1. Запустите файл `periodic.py` для создания базы данных.
+2. В файле `periodic.py` задайте необходимое вам расписание запуска модуля `vk_parser`.
 Вам может потребоваться [документация](https://docs.celeryproject.org/en/latest/userguide/periodic-tasks.html#crontab-schedules).<br>
 ```"schedule": crontab(hour=0, minute=0)```<br>
-2. В консоли запустите celery beat:<br>
+3. В консоли запустите celery beat:<br>
 ```celery -A periodic beat --loglevel=info```
-3. Создайте 2-ю консоль и там запустите celery worker:<br>
+4. Создайте 2-ю консоль и там запустите celery worker:<br>
 ```celery -A periodic worker --loglevel=info```
+
+### Добавление групп ВК
+При необходимости можно изменить (добивить, удалить) группы ВК.<br>
+Для этого в файле `settings.ini` отредактируейте строку *group_ids*:<br>
+> group_ids = <name_group1>,<name_group2><br>
+
+Обратите внимание, что разделять имена групп должен символ `,` без пробела.

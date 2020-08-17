@@ -144,3 +144,4 @@ cython_debug/
 node_modules/
 admin/
 ckeditor/
+vk_count.py

@@ -3,6 +3,9 @@ import requests
 from celery.schedules import crontab
 from datetime import datetime
 import sqlite3
+from configparser import ConfigParser
+
+
 
 """Создание приложения 'periodic' с брокером сообщений RebbitMQ"""
 app = Celery('periodic', broker="pyamqp://guest@localhost//")
@@ -11,12 +14,16 @@ app.conf.enable_utc = False
 
 @app.task
 def take_group_count():
-    token = '04cf9b5504cf9b5504cf9b555904bce3f2004cf04cf9b555bf94a8988d11539a4dcaea2'
-    version = 5.92
+    config = ConfigParser()
+    config.read("settings.ini")
+    token = config.get("VK_API", "token")
+    version = config.get("VK_API", "version")
+    url = config.get("VK_API", "url")
+    group_ids = "".join(config.get("VK_API", "group_ids"))
     fields = 'members_count'
-    group_ids = 'rambler,ramblermail,horoscopesrambler,championat,championat.auto,championat_cybersport,livejournal,afisha'
 
-    response = requests.get('https://api.vk.com/method/groups.getById',
+    """Получение ответа от VK_API"""
+    response = requests.get(url,
                             params={
                                 'access_token': token,
                                 'v': version,
@@ -24,38 +31,39 @@ def take_group_count():
                                 'fields': fields
                             })
 
+    """Экстракция данных из объекта response и подготовка их к внесению в БД"""
     date = response.json()['response']
     list_counts = [item['members_count'] for item in date]
-    _total_count = sum(list_counts)
-    _list_group = [(item['name'], item['members_count']) for item in date]
-    return _list_group, _total_count
+    total_count = sum(list_counts)
+    history_record = [(group_ids, total_count)]
+    list_group = [(group_ids, str(datetime.now()))]
 
-
-list_group = take_group_count()[0]
-total_count = take_group_count()[1]
-
-@app.task
-def insert_to_db():
+    """Соединение с БД"""
     conn = sqlite3.connect("db_parser.db")
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM group_vk")
-    cursor.executemany("INSERT INTO group_vk VALUES (?, ?)", list_group)
+    """Создание БД"""
+    cursor.execute("""CREATE TABLE IF NOT EXISTS group_vk 
+                      (name TEXT PRIMARY KEY,
+                      created_db TEXT)""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS history_record 
+                      (group_name TEXT,
+                      members_count INT,
+                      created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
 
-    history_record = [(str(datetime.now()), total_count)]
-    cursor.executemany("INSERT INTO history_record VALUES (?, ?)", history_record)
+    """Наполнение БД"""
+    cursor.executemany("INSERT OR IGNORE INTO group_vk VALUES (?, ?)", list_group)
+    cursor.executemany("INSERT OR IGNORE INTO history_record (group_name, members_count) VALUES (?, ?)", history_record)
 
+    """Применение внесенных изменений в БД и закрытие БД"""
     conn.commit()
     conn.close()
 
+
 app.conf.beat_schedule = {
-    "insert_to_db-in-onetime-everyday-task": {
-        "task": "periodic.insert_to_db",
-        "schedule": crontab(hour=8, minute="32")
-    },
     "total_count-in-onetime-everyday-task": {
         "task": "periodic.take_group_count",
-        "schedule": crontab(hour=8, minute="31")
+        "schedule": crontab(hour=22, minute=0)
     }
 }
 

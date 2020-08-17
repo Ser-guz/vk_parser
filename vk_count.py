@@ -1,31 +1,39 @@
 import sqlite3
+from configparser import ConfigParser
 from datetime import datetime
 import requests
 
-group_ids = 'rambler,ramblermail,horoscopesrambler,championat,championat.auto,championat_cybersport,livejournal,afisha'
 
-
-def take_group_count(groups):
-    token = '04cf9b5504cf9b5504cf9b555904bce3f2004cf04cf9b555bf94a8988d11539a4dcaea2'
-    version = 5.92
+def take_group_count():
+    config = ConfigParser()
+    config.read("settings.ini")
+    token = config.get("VK_API", "token")
+    version = config.getfloat("VK_API", "version")
+    url = config.get("VK_API", "url")
     fields = 'members_count'
+    groups = "".join(config.get("VK_API", "group_ids"))
 
-    response = requests.get('https://api.vk.com/method/groups.getById',
+    response = requests.get(url,
                             params={
                                 'access_token': token,
                                 'v': version,
                                 'group_ids': groups,
                                 'fields': fields
                             })
-
     date = response.json()['response']
     list_counts = [item['members_count'] for item in date]
-    _total_count = sum(list_counts)
-    _list_group = [(item['name'], item['members_count']) for item in date]
-    return _list_group, _total_count
+    total_count = sum(list_counts)
+    list_group = [item['name'] for item in date]
+    history_record = [(str(datetime.now()), total_count)]
+    group = tuple(groups,)
+    qw = groups.partition('12345')
+    qwe = []
 
-list_group = take_group_count(group_ids)[0]
-total_count = take_group_count(group_ids)[1]
+
+    print(1)
+
+
+list_group, total_count = take_group_count()
 
 conn = sqlite3.connect("db_parser.db")
 cursor = conn.cursor()

@@ -4,6 +4,7 @@ from celery.schedules import crontab
 from datetime import datetime
 import sqlite3
 
+"""Создание приложения 'periodic' с брокером сообщений RebbitMQ"""
 app = Celery('periodic', broker="pyamqp://guest@localhost//")
 """Отключение службы часовых поясов для возможности использовать Celery местное время"""
 app.conf.enable_utc = False
@@ -33,22 +34,29 @@ def take_group_count():
 list_group = take_group_count()[0]
 total_count = take_group_count()[1]
 
-conn = sqlite3.connect("db_parser.db")
-cursor = conn.cursor()
+@app.task
+def insert_to_db():
+    conn = sqlite3.connect("db_parser.db")
+    cursor = conn.cursor()
 
-cursor.execute("DELETE FROM group_vk")
-cursor.executemany("INSERT INTO group_vk VALUES (?, ?)", list_group)
+    cursor.execute("DELETE FROM group_vk")
+    cursor.executemany("INSERT INTO group_vk VALUES (?, ?)", list_group)
 
-update_date = str(datetime.now())
-history_record = [(update_date, total_count)]
-cursor.executemany("INSERT INTO history_record VALUES (?, ?)", history_record)
+    update_date = str(datetime.now())
+    history_record = [(update_date, total_count)]
+    cursor.executemany("INSERT INTO history_record VALUES (?, ?)", history_record)
 
-conn.commit()
-conn.close()
+    conn.commit()
+    conn.close()
 
 app.conf.beat_schedule = {
+    "insert_to_db-in-onetime-everyday-task": {
+        "task": "periodic.insert_to_db",
+        "schedule": crontab(hour=8, minute="32")
+    },
     "total_count-in-ten-seconds-task": {
         "task": "periodic.take_group_count",
-        "schedule": crontab(hour=0, minute=41)
+        "schedule": crontab(hour=8, minute="31")
     }
 }
+

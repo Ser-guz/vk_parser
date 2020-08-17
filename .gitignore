@@ -145,3 +145,4 @@ node_modules/
 admin/
 ckeditor/
 vk_count.py
+.db

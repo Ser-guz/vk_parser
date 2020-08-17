@@ -6,21 +6,24 @@ import sqlite3
 from configparser import ConfigParser
 
 
-
 """Создание приложения 'periodic' с брокером сообщений RebbitMQ"""
 app = Celery('periodic', broker="pyamqp://guest@localhost//")
+
 """Отключение службы часовых поясов для возможности использовать Celery местное время"""
 app.conf.enable_utc = False
 
 @app.task
 def take_group_count():
+    """Получение ответа от VK_API, экстрация из него суммарного числа участников групп ВК
+    и внесение этих данных в базу данных"""
+
     config = ConfigParser()
     config.read("settings.ini")
     token = config.get("VK_API", "token")
     version = config.get("VK_API", "version")
     url = config.get("VK_API", "url")
     group_ids = "".join(config.get("VK_API", "group_ids"))
-    fields = 'members_count'
+    fields = "".join(config.get("VK_API", "fields"))
 
     """Получение ответа от VK_API"""
     response = requests.get(url,
@@ -42,15 +45,6 @@ def take_group_count():
     conn = sqlite3.connect("db_parser.db")
     cursor = conn.cursor()
 
-    """Создание БД"""
-    cursor.execute("""CREATE TABLE IF NOT EXISTS group_vk 
-                      (name TEXT PRIMARY KEY,
-                      created_db TEXT)""")
-    cursor.execute("""CREATE TABLE IF NOT EXISTS history_record 
-                      (group_name TEXT,
-                      members_count INT,
-                      created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
-
     """Наполнение БД"""
     cursor.executemany("INSERT OR IGNORE INTO group_vk VALUES (?, ?)", list_group)
     cursor.executemany("INSERT OR IGNORE INTO history_record (group_name, members_count) VALUES (?, ?)", history_record)
@@ -59,11 +53,28 @@ def take_group_count():
     conn.commit()
     conn.close()
 
+def init_db():
+    """Создание БД"""
+    conn = sqlite3.connect("db_parser.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""CREATE TABLE IF NOT EXISTS group_vk 
+                          (name TEXT PRIMARY KEY,
+                          created_db TEXT)""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS history_record 
+                          (group_name TEXT,
+                          members_count INT,
+                          created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
+    conn.commit()
+    conn.close()
 
 app.conf.beat_schedule = {
     "total_count-in-onetime-everyday-task": {
         "task": "periodic.take_group_count",
-        "schedule": crontab(hour=22, minute=0)
+        "schedule": crontab(hour=2, minute=10)
     }
 }
+
+if __name__ == '__main__':
+    init_db()
 

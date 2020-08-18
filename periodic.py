@@ -15,7 +15,7 @@ app.conf.enable_utc = False
 @app.task
 def take_group_info():
     """Получение ответа от VK_API, экстрация из него суммарного числа участников групп ВК
-    и внесение этих данных в БД>"""
+    и внесение этих данных в БД"""
 
     config = ConfigParser()
     config.read("settings.ini")
@@ -33,6 +33,12 @@ def take_group_info():
                                 'group_ids': group_ids,
                                 'fields': fields
                             })
+
+    """Фиксация ошибки с кодом 500"""
+    if response.status_code == 500:
+        print("\033[33m {}".format("Unexpected error: response's status_code from VK_API = 500."))
+    elif response.status_code == 200:
+        print("OK. Response's status_code from VK_API = 200.")
 
     """Экстракция данных из объекта response и подготовка их к внесению в БД"""
     date = response.json()['response']
@@ -77,7 +83,7 @@ def init_db():
 app.conf.beat_schedule = {
     "take_group_info-in-onetime-everyday-task": {
         "task": "periodic.take_group_info",
-        "schedule": crontab(hour=10, minute=44)
+        "schedule": crontab(hour=18, minute=6)
     }
 }
 

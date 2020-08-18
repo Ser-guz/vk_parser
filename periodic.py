@@ -13,9 +13,9 @@ app = Celery('periodic', broker="pyamqp://guest@localhost//")
 app.conf.enable_utc = False
 
 @app.task
-def take_group_count():
+def take_group_info():
     """Получение ответа от VK_API, экстрация из него суммарного числа участников групп ВК
-    и внесение этих данных в базу данных"""
+    и внесение этих данных в БД>"""
 
     config = ConfigParser()
     config.read("settings.ini")
@@ -40,6 +40,7 @@ def take_group_count():
     total_count = sum(list_counts)
     history_record = [(group_ids, total_count)]
     list_group = [(group_ids, str(datetime.now()))]
+    list_group_detail = [(item['name'], item['members_count']) for item in date]
 
     """Соединение с БД"""
     conn = sqlite3.connect("db_parser.db")
@@ -48,6 +49,7 @@ def take_group_count():
     """Наполнение БД"""
     cursor.executemany("INSERT OR IGNORE INTO group_vk VALUES (?, ?)", list_group)
     cursor.executemany("INSERT OR IGNORE INTO history_record (group_name, members_count) VALUES (?, ?)", history_record)
+    cursor.executemany("INSERT OR IGNORE INTO group_vk_detail (name, members_count) VALUES (?, ?)", list_group_detail)
 
     """Применение внесенных изменений в БД и закрытие БД"""
     conn.commit()
@@ -65,13 +67,17 @@ def init_db():
                           (group_name TEXT,
                           members_count INT,
                           created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS group_vk_detail
+                          (name TEXT PRIMARY KEY,
+                          members_count INT,
+                          created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
     conn.commit()
     conn.close()
 
 app.conf.beat_schedule = {
-    "total_count-in-onetime-everyday-task": {
-        "task": "periodic.take_group_count",
-        "schedule": crontab(hour=2, minute=10)
+    "take_group_info-in-onetime-everyday-task": {
+        "task": "periodic.take_group_info",
+        "schedule": crontab(hour=10, minute=44)
     }
 }
 

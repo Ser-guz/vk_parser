@@ -36,15 +36,14 @@ def take_group_info():
 
     """Перехват исключений"""
     if response.status_code != 200:
-        raise TakeGroupInfoException("Response has unexceped status code.")
+        raise TakeGroupInfoException(f"Response has unexcepted status code: {response.status_code}")
     if not response.json()['response']:
-        raise TakeGroupInfoException("Response han't dict 'response'.")
+        raise TakeGroupInfoException("Response has no dict 'response'.")
 
     """Экстракция данных из объекта response и подготовка их к внесению в БД"""
     data = response.json()['response']
     history_record = [(item['name'], item['members_count']) for item in data]
-    list_groups = [item['name'] for item in data]
-    list_groups = [(list_groups[i],) for i in range(len(list_groups))]
+    list_groups = [(item['name'],) for item in data]
 
     """Соединение с БД"""
     conn = sqlite3.connect("db_parser.db")
@@ -77,7 +76,7 @@ def init_db():
 app.conf.beat_schedule = {
     "take_group_info-in-onetime-everyday-task": {
         "task": "periodic.take_group_info",
-        "schedule": crontab(hour=4, minute=39)
+        "schedule": crontab(hour=9, minute=13)
     }
 }
 

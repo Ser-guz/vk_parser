@@ -44,7 +44,7 @@ def take_group_info():
     data = response.json()['response']
     history_record = [(item['name'], item['members_count']) for item in data]
     list_groups = [item['name'] for item in data]
-    list_groups = [(list_groups[item],) for item in range(len(list_groups))]
+    list_groups = [(list_groups[i],) for i in range(len(list_groups))]
 
     """Соединение с БД"""
     conn = sqlite3.connect("db_parser.db")
@@ -52,7 +52,7 @@ def take_group_info():
 
     """Наполнение БД"""
     cursor.executemany("INSERT OR IGNORE INTO group_vk (name) VALUES (?)", list_groups)
-    cursor.executemany("INSERT OR IGNORE INTO history_record (group_name, members_count) VALUES (?, ?)", history_record)
+    cursor.executemany("INSERT OR IGNORE INTO history_record (name, members_count) VALUES (?, ?)", history_record)
 
     """Применение внесенных изменений в БД и закрытие БД"""
     conn.commit()
@@ -68,7 +68,7 @@ def init_db():
                           (name TEXT PRIMARY KEY,
                           created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
     cursor.execute("""CREATE TABLE IF NOT EXISTS history_record 
-                          (group_name TEXT,
+                          (name TEXT,
                           members_count INT,
                           created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
     conn.commit()
@@ -77,7 +77,7 @@ def init_db():
 app.conf.beat_schedule = {
     "take_group_info-in-onetime-everyday-task": {
         "task": "periodic.take_group_info",
-        "schedule": crontab(hour=0, minute=0)
+        "schedule": crontab(hour=4, minute=39)
     }
 }
 

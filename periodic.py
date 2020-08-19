@@ -1,16 +1,16 @@
 from celery import Celery
 import requests
 from celery.schedules import crontab
-from datetime import datetime
 import sqlite3
 from configparser import ConfigParser
+from exceptions import TakeGroupInfoException
 
-
-"""Создание приложения 'periodic' с брокером сообщений RebbitMQ"""
+"""Создание приложения 'periodic' с брокером сообщений RabbitMQ"""
 app = Celery('periodic', broker="pyamqp://guest@localhost//")
 
 """Отключение службы часовых поясов для возможности использовать Celery местное время"""
 app.conf.enable_utc = False
+
 
 @app.task
 def take_group_info():
@@ -34,32 +34,30 @@ def take_group_info():
                                 'fields': fields
                             })
 
-    """Фиксация ошибки с кодом 500"""
-    if response.status_code == 500:
-        print("\033[33m {}".format("Unexpected error: response's status_code from VK_API = 500."))
-    elif response.status_code == 200:
-        print("OK. Response's status_code from VK_API = 200.")
+    """Перехват исключений"""
+    if response.status_code != 200:
+        raise TakeGroupInfoException("Response has unexceped status code.")
+    if not response.json()['response']:
+        raise TakeGroupInfoException("Response han't dict 'response'.")
 
     """Экстракция данных из объекта response и подготовка их к внесению в БД"""
-    date = response.json()['response']
-    list_counts = [item['members_count'] for item in date]
-    total_count = sum(list_counts)
-    history_record = [(group_ids, total_count)]
-    list_group = [(group_ids, str(datetime.now()))]
-    list_group_detail = [(item['name'], item['members_count']) for item in date]
+    data = response.json()['response']
+    history_record = [(item['name'], item['members_count']) for item in data]
+    list_groups = [item['name'] for item in data]
+    list_groups = [(list_groups[item],) for item in range(len(list_groups))]
 
     """Соединение с БД"""
     conn = sqlite3.connect("db_parser.db")
     cursor = conn.cursor()
 
     """Наполнение БД"""
-    cursor.executemany("INSERT OR IGNORE INTO group_vk VALUES (?, ?)", list_group)
+    cursor.executemany("INSERT OR IGNORE INTO group_vk (name) VALUES (?)", list_groups)
     cursor.executemany("INSERT OR IGNORE INTO history_record (group_name, members_count) VALUES (?, ?)", history_record)
-    cursor.executemany("INSERT OR IGNORE INTO group_vk_detail (name, members_count) VALUES (?, ?)", list_group_detail)
 
     """Применение внесенных изменений в БД и закрытие БД"""
     conn.commit()
     conn.close()
+
 
 def init_db():
     """Создание БД"""
@@ -68,13 +66,9 @@ def init_db():
 
     cursor.execute("""CREATE TABLE IF NOT EXISTS group_vk 
                           (name TEXT PRIMARY KEY,
-                          created_db TEXT)""")
+                          created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
     cursor.execute("""CREATE TABLE IF NOT EXISTS history_record 
                           (group_name TEXT,
-                          members_count INT,
-                          created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
-    cursor.execute("""CREATE TABLE IF NOT EXISTS group_vk_detail
-                          (name TEXT PRIMARY KEY,
                           members_count INT,
                           created_db TIMESTAMP DEFAULT (datetime('now','localtime')))""")
     conn.commit()
@@ -83,7 +77,7 @@ def init_db():
 app.conf.beat_schedule = {
     "take_group_info-in-onetime-everyday-task": {
         "task": "periodic.take_group_info",
-        "schedule": crontab(hour=18, minute=6)
+        "schedule": crontab(hour=0, minute=0)
     }
 }
 

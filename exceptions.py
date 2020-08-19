@@ -1,0 +1,2 @@
+class TakeGroupInfoException(Exception):
+    pass

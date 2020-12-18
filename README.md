@@ -8,7 +8,7 @@
 2. Установите зависимости:<br>
 ```pip install -r requirements.txt```
 
-## Runnig
+## Runni
 1. Запустите файл `periodic.py` для создания БД.
 2. В файле `periodic.py` задайте необходимое вам расписание запуска модуля `vk_parser`.
 Вам может потребоваться следующая [документация](https://docs.celeryproject.org/en/latest/userguide/periodic-tasks.html#crontab-schedules).<br>
@@ -24,4 +24,7 @@
 ```group_ids = <name_group1>,<name_group2>...```<br>
 Обратите внимание, что разделять имена групп должен символ `,` без пробела.
 
-
+### Полезная информация
+Эта информация поможет во внедрении celery cron в код своего парсера:
+- https://medium.com/the-andela-way/asynchronous-processing-in-celery-79f88fa599a5
+- https://medium.com/the-andela-way/timed-periodic-tasks-in-celery-58c99ecf3f80
